@@ -1,0 +1,83 @@
+---
+title: "Machine Learning - Project"
+author: "Kenji Matsuzawa"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Overview
+We will do the machine learning course project, to learn more about the steps to do the machine learning project.
+
+The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+# Background of the Analysis
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Data explanation
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. 
+
+# Data Analysis and Machine Learning
+## Data Load, Data Preparation & Exploratory Data Analysis
+First to load data from the url, and store data to the objects named training and testing.
+```{r}
+training <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"))
+testing <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"))
+dim(training)
+dim(testing)
+```
+
+By looking at the training and testing data, we have many columns which is fully filled with NAs and also no variance in the testing data set which doesn't make any difference in the predictions. In addition we remove the columns which is not relevant for the analysis. (eg. column named "X") Successfully removed around 100 columns whicn is not useful and convert the timestamp from the type character to posixct.
+```{r}
+colSums(is.na(testing))
+nacolmns <- names(testing[,colSums(is.na(testing)) == 20])
+
+training <- training[, !(colnames(training) %in% nacolmns)]
+testing <- testing[, !(colnames(testing) %in% nacolmns)]
+
+training <- training[, !(colnames(training) %in% c("X", "new_window", "problem_id"))]
+testing <- testing[, !(colnames(testing) %in% c("X", "new_window", "problem_id"))]
+
+training$cvtd_timestamp <- as.POSIXct(training$cvtd_timestamp)
+testing$cvtd_timestamp <- as.POSIXct(testing$cvtd_timestamp)
+str(training)
+str(testing)
+dim(testing)
+dim(training)
+```
+
+## Machine Learning Modeling
+By spliting the training data set into training and cross valication set. I splited with 70% trainig and 30% for validation to see the performance of the model. First tried to do very basic random forest model to see the validation results.
+```{r cache=TRUE}
+library(caret)
+set.seed(999)
+# sprint training data to training and validation
+inTrain <- createDataPartition(y = training$classe, p=0.7, list=F)
+df_train <- training[inTrain, ]
+df_val <- training[-inTrain, ]
+
+modOrg <- train(classe ~ ., method="rf", data=df_train)
+predrf <- predict(modOrg, df_val)
+confusionMatrix(as.factor(predrf), as.factor(df_val$classe))
+varImp(modOrg$finalModel)
+
+print(modOrg)
+print(modOrg$finalModel)
+```
+
+Based on the validation result, it has very good prediction accuracy more than 99% for the validation data set, also by looking at the varImp function, it seems working as expected. Out of sample error is expected to be the same as the validation result, then it is expected between 0.9983 and 0.9998 with 95% confidence level.
+Out of bag error rate is 0.8%.
+
+## testing analysis
+By using the data for the testing, we need predict the "classe" for testing data sentto see the respective predicted value for all testing data.
+```{r}
+predrftest <- predict(modOrg, testing)
+predrftest
+```
+The result for the 20 testing case, passed the prediction testing with 20/20 point scored.
